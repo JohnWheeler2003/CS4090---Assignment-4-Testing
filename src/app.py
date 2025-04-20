@@ -1,7 +1,18 @@
+import os
+import sys
+
+# ensure the project root (one level up) is on sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from src.tasks import generate_unique_id
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 from tasks import load_tasks, save_tasks, filter_tasks_by_priority, filter_tasks_by_category
+import subprocess
 
 def main():
     st.title("To-Do Application")
@@ -23,7 +34,7 @@ def main():
         
         if submit_button and task_title:
             new_task = {
-                "id": len(tasks) + 1,
+                "id": generate_unique_id(tasks),
                 "title": task_title,
                 "description": task_description,
                 "priority": task_priority,
@@ -35,7 +46,45 @@ def main():
             tasks.append(new_task)
             save_tasks(tasks)
             st.sidebar.success("Task added successfully!")
-    
+
+            # ——————— Run unit tests button ———————
+        if st.sidebar.button("Run unit tests"):
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            result = subprocess.run(
+                ["pytest", "--maxfail=1", "-q"],
+                cwd=project_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            st.text(result.stdout)
+
+
+            # ——————— Run coverage report button ———————
+        if st.sidebar.button("Run coverage report"):
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            result = subprocess.run(
+                ["pytest", "--cov=src.tasks", "--cov-report=term-missing", "-q"],
+                cwd=project_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            st.text("Coverage Report:\n" + result.stdout)
+
+            # ——————— Generate HTML report  ———————
+        if st.sidebar.button("Generate HTML report"):
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            result = subprocess.run(
+                ["pytest", "-q"],             # pytest.ini’s addopts kicks in
+                cwd=project_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            st.text("HTML report written to report.html\n" + result.stdout)
+
+
     # Main area to display tasks
     st.header("Your Tasks")
     

@@ -21,8 +21,12 @@ def load_tasks(file_path=DEFAULT_TASKS_FILE):
     except FileNotFoundError:
         return []
     except json.JSONDecodeError:
-        # Handle corrupted JSON file
-        print(f"Warning: {file_path} contains invalid JSON. Creating new tasks list.")
+        # Handle corrupted JSON file: back it up and start fresh
+        backup = file_path + ".bak"
+        os.replace(file_path, backup)
+        print(f"Warning: {file_path} was invalid JSON. Backed up to {backup}. Starting fresh.")
+        # overwrite with an empty list so next run won’t re‑fail
+        save_tasks([], file_path)
         return []
 
 def save_tasks(tasks, file_path=DEFAULT_TASKS_FILE):
@@ -107,19 +111,26 @@ def search_tasks(tasks, query):
            query in task.get("description", "").lower()
     ]
 
+
 def get_overdue_tasks(tasks):
     """
     Get tasks that are past their due date and not completed.
-    
-    Args:
-        tasks (list): List of task dictionaries
-        
-    Returns:
-        list: List of overdue tasks
+
+    Only tasks with a valid YYYY-MM-DD due_date are considered.
     """
-    today = datetime.now().strftime("%Y-%m-%d")
-    return [
-        task for task in tasks 
-        if not task.get("completed", False) and 
-           task.get("due_date", "") < today
-    ]
+    today = datetime.now().date()
+    overdue = []
+    for task in tasks:
+        if task.get("completed", False):
+            continue
+        due_str = task.get("due_date", "")
+        if not due_str:
+            continue
+        try:
+            due_date = datetime.strptime(due_str, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            # skip missing or malformed dates
+            continue
+        if due_date < today:
+            overdue.append(task)
+    return overdue
